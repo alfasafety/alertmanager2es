@@ -18,8 +18,7 @@ RUN ./alertmanager2es -help
 #############################################
 # FINAL IMAGE
 #############################################
-FROM gcr.io/distroless/static
-#ENV LOG_JSON=1
+FROM quay.io/prometheus/busybox:latest
 COPY --from=build /go/src/github.com/arnaudlemaignen/alertmanager2es/alertmanager2es /
 USER 1000
 
