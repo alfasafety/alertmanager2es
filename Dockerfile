@@ -20,7 +20,6 @@ RUN ./alertmanager2es -help
 #############################################
 FROM quay.io/prometheus/busybox:latest
 COPY --from=build /go/src/github.com/arnaudlemaignen/alertmanager2es/alertmanager2es /
-USER 1000
 
 EXPOSE 9097
 

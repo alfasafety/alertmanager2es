@@ -90,7 +90,10 @@ func main() {
 	http.HandleFunc("/webhook", prometheus.InstrumentHandlerFunc("webhook", http.HandlerFunc(handler)))
 
 	log.Print(versionString)
+	log.Printf("Version %s", versionString)
 	log.Printf("Listening on %s", addr)
+	log.Printf("esIndexName %s", esIndexName)
+	log.Printf("esURL %s", esURL)
 	log.Fatal(s.ListenAndServe())
 }
 
