@@ -137,6 +137,9 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	// ISO8601: https://github.com/golang/go/issues/2141#issuecomment-66058048
 	msg.Timestamp = now.Format(time.RFC3339)
+	//AL reinject start end without nesting only works if 1 notification per alert (group[...])
+	msg.StartsAt = msg.Alerts[0].StartsAt
+	msg.EndsAt = msg.Alerts[0].EndsAt
 
 	index := fmt.Sprintf("%s-%s/%s", esIndexName, now.Format(esIndexDateFormat), esType)
 	url := fmt.Sprintf("%s/%s", esURL, index)
@@ -205,5 +208,7 @@ type notification struct {
 	GroupKey          string            `json:"groupKey"`
 
 	// Timestamp records when the alert notification was received
-	Timestamp string `json:"@timestamp"`
+	Timestamp 	 string            `json:"@timestamp"`
+	StartsAt     time.Time         `json:"@startsAt"`
+	EndsAt       time.Time         `json:"@endsAt"`
 }
