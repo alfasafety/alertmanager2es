@@ -13,6 +13,8 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/orian/go-http-instrument/instrumentation"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -87,7 +89,10 @@ func main() {
 		fmt.Fprint(w, versionString)
 	})
 	http.Handle("/metrics", promhttp.Handler())
-	http.HandleFunc("/webhook", prometheus.InstrumentHandlerFunc("webhook", http.HandlerFunc(handler)))
+	//#AL original code was
+	//http.HandleFunc("/webhook", prometheus.InstrumentHandlerFunc("webhook", http.HandlerFunc(handler)))
+	//find a project that continued the InstrumentHandlerFunc https://github.com/orian/go-http-instrument
+	http.HandleFunc("/webhook", instrumentation.InstrumentHandlerFunc("webhook", http.HandlerFunc(handler)))
 
 	log.Print(versionString)
 	log.Printf("Version %s", versionString)
@@ -208,7 +213,7 @@ type notification struct {
 	GroupKey          string            `json:"groupKey"`
 
 	// Timestamp records when the alert notification was received
-	Timestamp 	 string            `json:"@timestamp"`
-	StartsAt     time.Time         `json:"@startsAt"`
-	EndsAt       time.Time         `json:"@endsAt"`
+	Timestamp string    `json:"@timestamp"`
+	StartsAt  time.Time `json:"@startsAt"`
+	EndsAt    time.Time `json:"@endsAt"`
 }
