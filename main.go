@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -12,8 +13,6 @@ import (
 	"os"
 	"runtime"
 	"time"
-
-	"github.com/orian/go-http-instrument/instrumentation"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -26,11 +25,12 @@ var (
 	application = "alertmanager2es"
 	// See AlertManager docs for info on alert groupings:
 	// https://prometheus.io/docs/alerting/configuration/#route-<route>
-	esType = "alert_group"
 	// Index by month as we don't produce enough data to warrant a daily index
 	esIndexDateFormat = "2006.01"
 	esIndexName       = "alertmanager"
 	esURL             string
+	esUsername        string
+	esPassword        string
 	revision          = "unknown"
 	versionString     = fmt.Sprintf("%s %s (%s)", application, revision, runtime.Version())
 
@@ -57,13 +57,19 @@ func init() {
 	prometheus.MustRegister(notificationsReceived)
 }
 
+func basicAuth(username, password string) string {
+	auth := esUsername + ":" + esPassword
+	return base64.StdEncoding.EncodeToString([]byte(auth))
+}
+
 func main() {
 	var showVersion bool
 	flag.StringVar(&addr, "addr", addr, "host:port to listen to")
 	flag.StringVar(&esIndexDateFormat, "esIndexDateFormat", esIndexDateFormat, "Elasticsearch index date format")
 	flag.StringVar(&esIndexName, "esIndexName", esIndexName, "Elasticsearch index name")
-	flag.StringVar(&esType, "esType", esType, "Elasticsearch document type ('_type')")
 	flag.StringVar(&esURL, "esURL", esURL, "Elasticsearch HTTP URL")
+	flag.StringVar(&esUsername, "esUsername", esUsername, "Elasticsearch username")
+	flag.StringVar(&esPassword, "esPassword", esPassword, "Elasticsearch password")
 	flag.BoolVar(&showVersion, "version", false, "Print version number and exit")
 	flag.Parse()
 
@@ -89,16 +95,10 @@ func main() {
 		fmt.Fprint(w, versionString)
 	})
 	http.Handle("/metrics", promhttp.Handler())
-	//#AL original code was
-	//http.HandleFunc("/webhook", prometheus.InstrumentHandlerFunc("webhook", http.HandlerFunc(handler)))
-	//find a project that continued the InstrumentHandlerFunc https://github.com/orian/go-http-instrument
-	http.HandleFunc("/webhook", instrumentation.InstrumentHandlerFunc("webhook", http.HandlerFunc(handler)))
+	http.HandleFunc("/webhook", prometheus.InstrumentHandlerFunc("webhook", http.HandlerFunc(handler)))
 
 	log.Print(versionString)
-	log.Printf("Version %s", versionString)
 	log.Printf("Listening on %s", addr)
-	log.Printf("esIndexName %s", esIndexName)
-	log.Printf("esURL %s", esURL)
 	log.Fatal(s.ListenAndServe())
 }
 
@@ -142,12 +142,9 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	// ISO8601: https://github.com/golang/go/issues/2141#issuecomment-66058048
 	msg.Timestamp = now.Format(time.RFC3339)
-	//AL reinject start end without nesting only works if 1 notification per alert (group[...])
-	msg.StartsAt = msg.Alerts[0].StartsAt
-	msg.EndsAt = msg.Alerts[0].EndsAt
 
-	index := fmt.Sprintf("%s-%s/%s", esIndexName, now.Format(esIndexDateFormat), esType)
-	url := fmt.Sprintf("%s/%s", esURL, index)
+	index := fmt.Sprintf("%s-%s", esIndexName, now.Format(esIndexDateFormat))
+	url := fmt.Sprintf("%s/%s/_doc", esURL, index)
 
 	b, err = json.Marshal(&msg)
 	if err != nil {
@@ -158,6 +155,9 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(b))
+	if (esUsername != "") && (esPassword != "") {
+		req.Header.Add("Authorization", "Basic "+basicAuth(esUsername, esPassword))
+	}
 	if err != nil {
 		notificationsErrored.Inc()
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -213,7 +213,5 @@ type notification struct {
 	GroupKey          string            `json:"groupKey"`
 
 	// Timestamp records when the alert notification was received
-	Timestamp string    `json:"@timestamp"`
-	StartsAt  time.Time `json:"@startsAt"`
-	EndsAt    time.Time `json:"@endsAt"`
+	Timestamp string `json:"@timestamp"`
 }
