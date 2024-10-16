@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+        "crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -31,6 +32,7 @@ var (
 	esURL             string
 	esUsername        string
 	esPassword        string
+        disableCertCheck  = true
 	revision          = "unknown"
 	versionString     = fmt.Sprintf("%s %s (%s)", application, revision, runtime.Version())
 
@@ -154,6 +156,10 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+        if disableCertCheck {
+                http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+        }
+	
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(b))
 	if (esUsername != "") && (esPassword != "") {
 		req.Header.Add("Authorization", "Basic "+basicAuth(esUsername, esPassword))
