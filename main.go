@@ -15,6 +15,8 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/orian/go-http-instrument/instrumentation"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -32,7 +34,7 @@ var (
 	esURL             string
 	esUsername        string
 	esPassword        string
-        disableCertCheck  = true
+	disableCertCheck  = true
 	revision          = "unknown"
 	versionString     = fmt.Sprintf("%s %s (%s)", application, revision, runtime.Version())
 
@@ -72,6 +74,7 @@ func main() {
 	flag.StringVar(&esURL, "esURL", esURL, "Elasticsearch HTTP URL")
 	flag.StringVar(&esUsername, "esUsername", esUsername, "Elasticsearch username")
 	flag.StringVar(&esPassword, "esPassword", esPassword, "Elasticsearch password")
+	flag.BoolVar(&disableCertCheck, "disableCertCheck", false, "Disable SSL certificate check")
 	flag.BoolVar(&showVersion, "version", false, "Print version number and exit")
 	flag.Parse()
 
@@ -97,7 +100,7 @@ func main() {
 		fmt.Fprint(w, versionString)
 	})
 	http.Handle("/metrics", promhttp.Handler())
-	http.HandleFunc("/webhook", prometheus.InstrumentHandlerFunc("webhook", http.HandlerFunc(handler)))
+	http.HandleFunc("/webhook", instrumentation.InstrumentHandlerFunc("webhook", http.HandlerFunc(handler)))
 
 	log.Print(versionString)
 	log.Printf("Listening on %s", addr)
@@ -159,7 +162,8 @@ func handler(w http.ResponseWriter, r *http.Request) {
         if disableCertCheck {
                 http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
         }
-	
+
+
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(b))
 	if (esUsername != "") && (esPassword != "") {
 		req.Header.Add("Authorization", "Basic "+basicAuth(esUsername, esPassword))
@@ -221,3 +225,4 @@ type notification struct {
 	// Timestamp records when the alert notification was received
 	Timestamp string `json:"@timestamp"`
 }
+
