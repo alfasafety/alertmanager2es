@@ -1,4 +1,4 @@
-module github.com/my-biz/alertmanager2es
+module alertmanager2es
 
 go 1.22.2
 
