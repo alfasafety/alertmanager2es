@@ -6,7 +6,7 @@ Contributions are welcomed.
 
 To download, run:
 
-    go get -u github.com/cloudflare/alertmanager2es
+    go install github.com/alfasafety/alertmanager2es@latest
 
 To run the tests:
 
